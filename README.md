@@ -1,4 +1,4 @@
-# ድግሶን: Event Management System
+# whiteboard
 
 ## Team Members
 

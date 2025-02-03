@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Distributed Whiteboard</title>
+    <style>
+        body { text-align: center; font-family: Arial, sans-serif; }
+        canvas { border: 2px solid black; cursor: crosshair; }
+        #status { margin-top: 10px; font-weight: bold; }
+        #toolbar { margin: 10px; }
+        .color-btn { width: 30px; height: 30px; border: none; cursor: pointer; margin: 2px; }
+        .eraser-btn { width: 60px; height: 30px; border: none; cursor: pointer; background: gray; color: white; }
+        
+        /* Floating text label */
+        #nameLabel {
+            position: absolute;
+            background: white;
+            padding: 5px;
+            border-radius: 5px;
+            font-size: 14px;
+            font-weight: bold;
+            color: blue;
+            display: none;
+            pointer-events: none;
+        }
+
+        /* Active users list */
+        #activeUsers {
+            margin-top: 20px;
+            text-align: left;
+            padding: 10px;
+            border: 1px solid #ccc;
+            width: 200px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+    </style>
+</head>
+<body>
+    <h2>Distributed Whiteboard</h2>
+    
+    <label for="username">Enter your name: </label>
+    <input type="text" id="username" placeholder="Your name">
+    <button onclick="connectWebSocket()">Join</button>
+    
+    <p id="status">Enter your name to connect...</p>
+    
+    <div id="toolbar">
+        <button class="color-btn" style="background: black;" onclick="setColor('black')"></button>
+        <button class="color-btn" style="background: red;" onclick="setColor('red')"></button>
+        <button class="color-btn" style="background: blue;" onclick="setColor('blue')"></button>
+        <button class="color-btn" style="background: green;" onclick="setColor('green')"></button>
+        <button class="eraser-btn" onclick="setColor('white')">Eraser</button>
+    </div>
+    
+    <canvas id="whiteboard" width="800" height="500"></canvas>
+    <div id="nameLabel"></div>
+
+    <div id="activeUsers">
+        <h3>Active Users:</h3>
+        <ul id="userList"></ul>
+    </div>
+    
+    <script>
+        let ws;
+        let username = "";
+        let drawing = false;
+        let lastX, lastY;
+        let color = "black";
+        const canvas = document.getElementById("whiteboard");
+        const ctx = canvas.getContext("2d");
+        const nameLabel = document.getElementById("nameLabel");
+        const userList = document.getElementById("userList");
+
+        function connectWebSocket() {
+            username = document.getElementById("username").value.trim();
+            if (!username) {
+                alert("Please enter your name before joining!");
+                return;
+            }
+
+            ws = new WebSocket("ws://localhost:8050/ws");
+
+            ws.onopen = () => {
+                document.getElementById("status").textContent = "Connected to WebSocket ✅";
+                ws.send(JSON.stringify({ name: username }));
+            };
+
+            ws.onerror = () => document.getElementById("status").textContent = "WebSocket Error ❌";
+            ws.onclose = () => document.getElementById("status").textContent = "Disconnected from WebSocket 🔴";
+
+            ws.onmessage = (event) => {
+                const data = JSON.parse(event.data);
+
+                if (data.type === "init") {
+                    // Initialize whiteboard and active users
+                    for (let key in data.shapes) {
+                        drawShape(JSON.parse(data.shapes[key]));
+                    }
+                    updateActiveUsers(data.users);
+                } else if (data.type === "join" || data.type === "leave") {
+                    // Handle user join/leave events
+                    updateActiveUsers(data.users);
+                } else {
+                    // Handle drawing updates
+                    drawShape(JSON.parse(data.data));
+                }
+            };
+        }
+
+        function setColor(newColor) {
+            color = newColor;
+        }
+
+        function drawShape(shape) {
+            ctx.beginPath();
+            ctx.moveTo(shape.x1, shape.y1);
+            ctx.lineTo(shape.x2, shape.y2);
+            ctx.strokeStyle = shape.color;
+            ctx.lineWidth = 2;
+            ctx.stroke();
+        }
+
+        function updateActiveUsers(users) {
+            userList.innerHTML = ""; // Clear the list
+            users.forEach(user => {
+                const li = document.createElement("li");
+                li.textContent = user;
+                userList.appendChild(li);
+            });
+        }
+
+        canvas.addEventListener("mousedown", (e) => {
+            if (!ws || ws.readyState !== WebSocket.OPEN) {
+                alert("Please connect first!");
+                return;
+            }
+            drawing = true;
+            lastX = e.offsetX;
+            lastY = e.offsetY;
+
+            nameLabel.style.display = "block";
+            nameLabel.textContent = `${username} is writing...`;
+        });
+
+        canvas.addEventListener("mousemove", (e) => {
+            if (!drawing) return;
+
+            const shape = {
+                id: username + "_" + Date.now(),
+                x1: lastX,
+                y1: lastY,
+                x2: e.offsetX,
+                y2: e.offsetY,
+                color: color,
+                name: username
+            };
+
+            drawShape(shape);
+            ws.send(JSON.stringify({ id: shape.id, data: JSON.stringify(shape) }));
+
+            lastX = e.offsetX;
+            lastY = e.offsetY;
+
+            nameLabel.style.left = e.pageX + 10 + "px";
+            nameLabel.style.top = e.pageY - 10 + "px";
+        });
+
+        canvas.addEventListener("mouseup", () => {
+            drawing = false;
+            nameLabel.style.display = "none";
+        });
+    </script>
+</body>
+</html>
