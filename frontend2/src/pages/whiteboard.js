@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
+import { motion } from "framer-motion";
 
 const Whiteboard = () => {
   const [username, setUsername] = useState("");
@@ -23,12 +24,9 @@ const Whiteboard = () => {
     };
 
     socket.onmessage = (event) => {
-      console.log("Received data:", event.data);
       const data = JSON.parse(event.data);
       if (data.type === "init") {
-        Object.values(data.shapes).forEach((shape) =>
-          drawShape(JSON.parse(shape))
-        );
+        Object.values(data.shapes).forEach((shape) => drawShape(JSON.parse(shape)));
         setActiveUsers(data.users);
       } else if (data.type === "join" || data.type === "leave") {
         setActiveUsers(data.users);
@@ -88,56 +86,57 @@ const Whiteboard = () => {
   }, []);
 
   return (
-    <div style={{ textAlign: "center" }}>
-      <h2>Distributed Whiteboard</h2>
-      <input
-        type="text"
-        placeholder="Enter your name"
-        value={username}
-        onChange={(e) => setUsername(e.target.value)}
-      />
-      <button onClick={connectWebSocket}>Join</button>
-
-      <div>
-        <button
-          style={{ background: "black" }}
-          onClick={() => setColor("black")}
-        />
-        <button style={{ background: "red" }} onClick={() => setColor("red")} />
-        <button
-          style={{ background: "blue" }}
-          onClick={() => setColor("blue")}
-        />
-        <button
-          style={{ background: "green" }}
-          onClick={() => setColor("green")}
-        />
-        <button
-          style={{ background: "gray", color: "white" }}
-          onClick={() => setColor("white")}
-        >
-          Eraser
-        </button>
-      </div>
-
-      <canvas
-        ref={canvasRef}
-        width={800}
-        height={500}
-        style={{ border: "2px solid black", cursor: "crosshair" }}
-        onMouseDown={startDrawing}
-        onMouseMove={draw}
-        onMouseUp={stopDrawing}
-      />
-
-      <div>
-        <h3>Active Users:</h3>
-        <ul>
-          {activeUsers.map((user, index) => (
-            <li key={index}>{user}</li>
+    <div className="flex flex-col items-center justify-center min-h-screen bg-gray-900 p-6">
+      <motion.div
+        initial={{ opacity: 0, y: -20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.5 }}
+        className="bg-gray-800 p-6 rounded-2xl shadow-xl w-full max-w-4xl"
+      >
+        <h2 className="text-white text-3xl font-semibold text-center mb-4">Distributed Whiteboard</h2>
+        <div className="flex space-x-2 mb-4">
+          <input
+            type="text"
+            placeholder="Enter your name"
+            value={username}
+            onChange={(e) => setUsername(e.target.value)}
+            className="flex-1 p-2 bg-gray-700 text-white rounded-lg focus:ring-2 focus:ring-blue-500"
+          />
+          <button
+            onClick={connectWebSocket}
+            className="bg-blue-600 hover:bg-blue-500 transition-all p-2 rounded-lg text-white font-semibold"
+          >
+            Join
+          </button>
+        </div>
+        <div className="flex space-x-2 mb-4">
+          {["black", "red", "blue", "green", "white"].map((col) => (
+            <button
+              key={col}
+              className={`w-10 h-10 rounded-full ${col === "white" ? "border border-gray-500" : ""}`}
+              style={{ background: col }}
+              onClick={() => setColor(col)}
+            />
           ))}
-        </ul>
-      </div>
+        </div>
+        <canvas
+          ref={canvasRef}
+          width={800}
+          height={500}
+          className="border-2 border-gray-700 rounded-lg cursor-crosshair w-full"
+          onMouseDown={startDrawing}
+          onMouseMove={draw}
+          onMouseUp={stopDrawing}
+        />
+        <div className="mt-4">
+          <h3 className="text-white text-xl font-semibold">Active Users:</h3>
+          <ul className="text-gray-400">
+            {activeUsers.map((user, index) => (
+              <li key={index}>{user}</li>
+            ))}
+          </ul>
+        </div>
+      </motion.div>
     </div>
   );
 };
